@@ -1,0 +1,44 @@
+---
+title: "TB prevalence in wild boar"
+author: "Zara Baker"
+date: "2024-11-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## TB prevalence in wild boar
+
+This dataset contains information on the disease phenotype of wild boar and investigates the relationship between this and potentially associated variables of sex, length and age.
+
+### Table to explain our variables:
+
+| Variable | Type of Variable | Description |
+|:-----:|:---------:|:---------:|
+| TB | Binary | Categorising individuals as infected (1) or uninfected (2) |
+| Age | Categorical | defining individuals into 1 of 4 age categories - juvenile, subadult, young adult, old adult (accurate age cannot be clearly defined in years) |
+|Length | Continuous | Nose-rump length, measured in cm |
+| Sex | Categorical | Defining individuals as male (1) or female (2) |
+
+### The Aim:
+Identify the risk factors for TB in this population. E.g. is infection equally distributed among the population? Can we make predictions about likelihood?
+
+### Step 1: Reading in the data
+
+This command will read in the data (provided you are within an R project), assigns NAs, and converts strings to factors:
+
+```{r Step 1: read in}
+dframe1<-read.csv("data/Boar.csv",na="NA",stringsAsFactors =T)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

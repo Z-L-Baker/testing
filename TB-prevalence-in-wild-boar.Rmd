@@ -1,0 +1,266 @@
+---
+title: "TB prevalence in wild boar"
+author: "Zara Baker"
+date: "2024-11-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## TB prevalence in wild boar
+
+This dataset contains information on the disease phenotype of wild boar and investigates the relationship between this and potentially associated variables of sex, length and age.
+
+#### Table to explain our variables:
+
+| Variable | Type of Variable | Description |
+|:-----:|:---------:|:---------:|
+| TB | Binary | Categorising individuals as infected (1) or uninfected (2) |
+| Age | Categorical | Defining individuals into 1 of 4 age categories - juvenile, subadult, young adult, old adult (accurate age cannot be clearly defined in years) |
+|Length | Continuous | Nose-rump length, measured in cm |
+| Sex | Categorical | Defining individuals as male (1) or female (2) |
+
+#### The Aim:
+Identify the risk factors for TB in this population. E.g. is infection equally distributed among the population? Can we make predictions about likelihood?
+
+### Step 1: Reading in the data
+
+This command will read in the data (provided you are within an R project), assigns NAs, and converts strings to factors:
+
+```{r Step 1: read in}
+dframe1<-read.csv("data/Boar.csv",na="NA",stringsAsFactors =T)
+```
+
+Have look at the dataframe, and various summaries to check the data:
+
+```{r Step 1: check data}
+summary(dframe1)
+names(dframe1)
+```
+
+Now we should plot the variables to examine distribution:
+
+```{r Step 1: plotting}
+hist(dframe1$Tb)
+hist(dframe1$age)
+hist(dframe1$sex)
+hist(dframe1$length)
+```
+
+Age and Sex are being treated as continuous variables but we need to turn them into categorical data:
+
+```{r Step 1: conversion}
+dframe1$age <- as.factor(dframe1$age)
+dframe1$sex <- as.factor(dframe1$sex)
+```
+
+Re-examine the data:
+
+```{r Step 1: reexamination}
+summary(dframe1)
+plot(dframe1$age)
+plot(dframe1$sex)
+plot(dframe1$length~dframe1$age)
+```
+
+NB:
+
+* Our sample size is rather small in the youngest age category
+
+* Length is clearly correlated with our age category
+
+* In a multivariate model, we should not include correlated variables
+
+
+Given that we have very small numbers in our youngest age group, and that for categorical variables we are losing more power (because each level means another degree of freedom lost) it is probably best to leave age out of the model: length can act as a proxy for age.
+
+#### This should remind you: it is really important to explore your variables thoroughly, before designing a model!
+
+
+
+### Step 2: Running a GLM
+
+*TB is binomial - so select the binomial error family.
+
+*Start with the default link function associated with the binomial error family - logit. 
+
+*Start by including all the single terms, and 2-way interactions. If age was in the model, we could theoretically also include the 3-way interaction with age - but given the small sample size in our youngest age category this would not be advisable
+
+
+```{r Step 2: initial GLM}
+model1 <- glm(Tb ~ length + sex
+              + length:sex,
+              family = binomial (link = logit),
+              data = dframe1)
+```
+
+
+
+### Step 3: Check the model fit
+
+Run our normal plot(model) function.. (we wouldn't normally do this for a binomial model - have a look though!)
+
+```{r Step 3: check normal model function}
+par(mfrow=c(2,2))
+plot(model1)
+```
+
+Our residual plots for normality and equality of variance are not meaningful for a binomial model!
+
+Remember, residuals are calculated by quantifying the difference between our observed y (TB) and our predicted y. In a binomial model, our observations are all 1, or 0. Our predictions are a predicted range of probability, on a scale of 0-1. So our predictions are continuous, and our observed data are not. This makes our usual interpretation of residuals meaningless. 
+
+####Lets do the checks for the model we are actually using: binomial (Bernoulli) GLM:
+
+```{r Step 3: check binomial model function}
+devresid1<-resid(model1, type="deviance")
+hist(devresid1)
+```
+
+Look for values>2 - this might indicate lack of fit.
+
+```{r Step 3: continue check}
+library(arm)
+x<-predict(model1)
+y<-resid(model1, type="deviance")
+binnedplot(x,y)
+```
+
+Check that <95% of dev resids fit within the grey lines, indicating +/- 2SE
+
+###Our model assumptions are met!
+
+We could compare this model with another, using the same error family but another link function (here - probit):
+
+```{r Step 3: compare}
+model2 <- glm(Tb ~ length + sex 
+              + length:sex,
+              family = binomial (link = probit),
+              data = dframe1)
+
+devresid2<-resid(model2, type="deviance")
+hist(devresid2)
+
+x<-predict(model2)
+y<-resid(model2, type="deviance")
+binnedplot(x,y)
+```
+
+Note these plots look identical to those from model1. 
+If a different error family / link shows no improvement, then always use the default link function for the relevant family.
+
+We can compare AIC to evaluate model efficiency:
+
+```{r Step 3: AIC comparison}
+AIC(model1); AIC(model2)
+```
+
+Very little difference (difference <2 is meaningless).
+
+
+
+### Step 4: Model Refinement
+
+```{r Step 4: refine}
+model3 <- glm(Tb ~ length + sex
+              + length:sex,
+              family = binomial (link = logit),
+              data = dframe1)
+
+drop1(model3)
+```
+
+Suggests leaving all terms - no reduction in AIC
+Re-check the model assumptions on the final model
+
+
+
+### Step 5: Summarise model
+
+```{r Step 5: Summarise}
+summary(model1)
+```
+
+NB:
+
+*Sex, and the length:sex interaction are not significant; length is significant - with a positive association.
+
+*'summary' applied to a GLM model object here is not providing R-Sq, and overall F statistic etc - these are not applicable where our model is not linear.
+
+*sex2 is shown - remember 2 was female. The difference shown (although not significant) is between the level shown, and our baseline category (in this case, males, [sex 1])
+
+*the length estimate is the slope coefficient for the association of length and TB
+
+
+We can calculate a measure of significance by testing whether the model with predictors fits significantly better than a model with just an intercept (i.e., a null model). This site gives a suggested means to calculate an overal test statistic and p value: <https://stats.idre.ucla.edu/r/dae/logit-regression/> as follows:
+
+```{r Step 5: check model}
+with(model1, null.deviance - deviance)
+with(model1, df.null - df.residual)
+with(model1, pchisq(null.deviance - deviance, df.null - df.residual, lower.tail = FALSE))
+```
+
+
+
+### Step 6: Visualise model using model predictions
+
+
+If we wanted to generate and plot model predictions this is what we would do. 
+First - I am going to simplify the model by removing sex, and sex:length (we could make the predictions with both in but for simplicity here I am removing them as they were not significant)
+
+The final model:
+
+```{r Step 6: final model}
+modelfinal <- glm(Tb ~ length,
+              family = binomial (link = logit),
+              data = dframe1)
+
+par (mfrow = c (1,1))
+```
+
+Now we should make a plot of the raw data. This looks a little odd - because all our observations are either 0, or 1. The plot shows us how many cases we have, across the length distribution. This gives us a 'background plot' of raw data on which we will add our model predictions:
+
+```{r Step 6: make plot}
+plot (dframe1$Tb ~ dframe1$length, 	
+      ylab = "Probability of having Tb",
+      xlab = "Body length (cm)" ,
+      col = "blue")
+```
+
+#### 1: Making a table of prediction data (pdat):
+
+```{r Step 6: make prediction data}
+pdat <- expand.grid(length = seq(40,180, 1) )
+```
+
+This says - make a sequence of data, including column 'length', which will start at 40, end at 180, at increments of 1
+
+#### 2: Making a file containing the predicted data (pred):
+
+```{r Step 6: make file containing predicted data}
+pred <- predict (modelfinal, newdata = pdat, type= "response", se.fit = TRUE)
+```
+
+This takes our final model, and using the model calculated coefficients (our slope and intercept values), it calculates new values of predicted y, based on set values of length that we created just now in our data series pdat. It also adds predicted standard error.
+
+#### 3: combine the predictions with the predictors, into a final dataframe (predframe) and add fitted line:
+
+```{r Step 6: combine}
+plot (dframe1$Tb ~ dframe1$length, 	
+      ylab = "Probability of having Tb",
+      xlab = "Body length (cm)" ,
+      col = "blue")
+
+predframe <- data.frame (pdat, preds = pred$fit, se = pred$se.fit)
+
+lines (predframe$preds ~ predframe$length, col="red", lwd = 2)
+
+predframe$upperse <- (predframe$preds + predframe$se )
+lines (predframe$upperse ~ predframe$length, lty = 2, col = "red", lwd = 1.5) 
+predframe$lowerse <- (predframe$preds - predframe$se)
+lines (predframe$lowerse ~ predframe$length, lty = 2, col = "red", lwd = 1.5) 
+```
+
+
+
